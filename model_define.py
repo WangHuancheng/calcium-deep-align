@@ -34,16 +34,17 @@ class Data(object):
 
 
 class Algin(nn.Module):
-    def __init__(self,internal_channel = 16,groups=8) -> None:
+    def __init__(self,internal_channel = 16,groups=8,lv=3) -> None:
         super().__init__()
         self.internal_channel = internal_channel
         self.groups=groups
         self.relu = nn.ReLU(True)
+        self.level=lv
         self.feature_extraction = FeatureExtraction(internal_channel) #feature -> [tensor(N,C,H,W),]
         #offset conv is used on concatted feature
-        self.offset_conv_lv1 = nn.Conv2d(internal_channel*2,internal_channel,3,padding=1)
-        self.offset_conv_lv2 = nn.Conv2d(internal_channel*2,internal_channel,3,padding=1)
-        self.offset_conv_lv3 = nn.Conv2d(internal_channel*2,internal_channel,3,padding=1)
+        self.offset_conv = []
+        for i in range(self.level):
+            self.offset_conv.append(nn.Conv2d(internal_channel*2,internal_channel,3,padding=1))
         self.dcn = DCN(internal_channel,internal_channel,3,padding=1,deform_groups=groups)
     
     def forward(self,ref_image,unreg_image):
@@ -55,7 +56,8 @@ class Algin(nn.Module):
         data_unreg.feature = self.feature_extraction(unreg_image)
         for i in range(data_ref.level-1,-1,-1):
             data_aligned.feature[i]=torch.cat(data_ref.feature[i],data_unreg.feature[i])
-            data_aligned.offset[i]=self.relu(data_aligned.feature)
+            #todo: add step that uses down level offset to generate up one
+            data_aligned.offset[i]=self.relu(self.offset_conv[i](data_aligned.feature))
             data_aligned.feature[i] = DCN(data_aligned.feature[i].data_aligned.offset[i])
             
 class DenoisedDataset(torch.utils.data.Dataset):
@@ -65,6 +67,9 @@ class DenoisedDataset(torch.utils.data.Dataset):
 
     def __len__():
         return None
+
+    def __getitem__(self,idx):
+        imgpath = self.imgdir + f'{idx}.tif'
     
     
 
