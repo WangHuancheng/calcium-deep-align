@@ -10,9 +10,9 @@ from numpy import array
 
 
 class FeatureExtraction(nn.Module): # return feature_lv1,feature_lv2,feature_lv3
-    def __init__(self,internal_channel=16) -> None:
+    def __init__(self,origin_channel,internal_channel=16,) -> None:
         super().__init__()
-        self.conv1 = nn.Conv2d(3,internal_channel,3,padding=1)
+        self.conv1 = nn.Conv2d(origin_channel,internal_channel,3,padding=1)
         self.conv2 = nn.Conv2d(internal_channel,internal_channel,3)
         self.conv3 = nn.Conv2d(internal_channel,internal_channel,3)
         self.relu = nn.ReLU(True)
@@ -22,14 +22,11 @@ class FeatureExtraction(nn.Module): # return feature_lv1,feature_lv2,feature_lv3
         feature_lv2 = self.relu(self.conv2(feature_lv1))
         feature_lv3 = self.relu(self.conv3(feature_lv2))
         return [feature_lv1,feature_lv2,feature_lv3]
-"""data_ref.feature[i]
-align(iter(Data.UnRegImages),Data.refimage)
-"""
 class Data(object):
-        def __init__(self,image=None,lv=3) -> None:#lv: level of feature pyramid
+        def __init__(self,image=None,level=3) -> None:#lv: level of feature pyramid
             self.image = image
             self.feature = [] #should contain torch.Tensor
-            self.level =lv
+            self.level =level
             
 
 
@@ -48,8 +45,8 @@ class Algin(nn.Module):
         self.dcn = DCN(internal_channel,internal_channel,3,padding=1,deform_groups=groups)
     
     def forward(self,ref_image,unreg_image):
-        data_ref = Data(ref_image,3)
-        data_unreg = Data(unreg_image,3)
+        data_ref = Data(ref_image,level=3)
+        data_unreg = Data(unreg_image,level=3)
         data_aligned = Data()
         data_aligned.offset = []
         data_ref.feature =  self.feature_extraction(ref_image,) 
