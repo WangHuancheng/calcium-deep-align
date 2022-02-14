@@ -1,13 +1,14 @@
+from cv2 import magnitude
 import torch
 import torch.nn as nn
-import mmcv
+import torchfields
 from mmcv.ops import DeformConv2dPack as DCN
 from tifffile import imread as tiff_read
+from tifffile import imwrite as tiff_write
 from matplotlib import pyplot as plt
-from torchvision.transforms import ToTensor
-
-from numpy import array
-
+import torchvision.transforms
+from motion_generate import MotionGenerator
+import numpy
 
 class FeatureExtraction(nn.Module): # return feature_lv1,feature_lv2,feature_lv3
     def __init__(self,origin_channel,internal_channel=16,) -> None:
@@ -68,14 +69,17 @@ class DenoisedDataset(torch.utils.data.Dataset):
     def __getitem__(self,idx):
         imgpath = self.imgdir + f'{idx}.tif'
     
-    
-
-
 if __name__ == "__main__":
-    print('main')
-    a =Algin()
-    ima = tiff_read('data/16.tif')
-    convert_tensor =ToTensor()
-    image = convert_tensor(ima)
-    image = nn.functional.normalize(image)
-    print(torch.std_mean(image))
+    print('model_define as main')
+    ima = torch.from_numpy(tiff_read('data/ground_truth/1.tif'))
+    max = torch.max(ima,0)[0]
+    max = torch.max(max,0)[0]
+    ima/=max
+    g = MotionGenerator(10,magnitude=1)
+    displace_field = torch.Field.identity(1, 2, 512 , 512)
+    displace_field = g(displace_field)
+    torch.save(displace_field,'data/df1.pt') 
+    warpped_img = displace_field(ima)
+    warpped_img*=max
+    tiff_write('data/wrapped_image/1_wrapped.tif',warpped_img.numpy(),imagej=True)
+    

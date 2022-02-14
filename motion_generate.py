@@ -1,23 +1,25 @@
-from math import exp
 import torch
-from torch import Tensor, tensor
+from torch import Tensor
 import torchfields
 import torchvision.transforms as T
 from PIL import Image
 from line_profiler import LineProfiler
 import random
 class MotionGenerator(torch.nn.Module):
-    def __init__(self, num_init_vector:int) -> None:
+    def __init__(self, num_init_vector:int,width=512,lenth=512,magnitude=1) -> None:
         """Generate random motion for 2D map,from sevral random vector,using Gaussian smooth voitng 
         to full the whole map 
             Arg:
-            num_init_vector:
-                how many initial vectors are used to generate displacement field
+                num_init_vector:
+                    how many initial vectors are used to generate displacement field
         """
         super().__init__()
         self.num_init_vector=num_init_vector
-    @profile
-    def __gauuse_voting(self,x,y,sigma =32) -> torch.tensor:
+        self.magnitude = magnitude
+        self.width = width
+        self.lenth = lenth
+        self.magnitude = magnitude
+    def __gauuse_voting(self,x,y,sigma =32) -> torch.Tensor:
         result = 0
         distance_x = x - self.x_coord
         distance_y = y - self.y_coord
@@ -25,14 +27,15 @@ class MotionGenerator(torch.nn.Module):
         result = (-distance).exp()
         return result
 
-    def forward(self, width=512,lenth=512) -> torch.field:
+    def forward(self,displace_field) -> torch.field:
         #TODO: regular magnitude of init vector
-        self.init_vectors = torch.randn(2,self.num_init_vector)/32
-        self.x_coord= torch.randint(0,width,(self.num_init_vector,))
-        self.y_coord= torch.randint(0,lenth,(self.num_init_vector,))
+        self.displace_field = displace_field
+        self.displace_field = torch.zeros(1,2,self.width,self.lenth)
+        self.init_vectors = torch.randn(2,self.num_init_vector)/ ((self.lenth+self.width)/32) * self.magnitude
+        self.x_coord= torch.randint(0,self.width,(self.num_init_vector,))
+        self.y_coord= torch.randint(0,self.lenth,(self.num_init_vector,))
         #ordinary field is zeros(no warp)
-        self.displace_field = torch.zeros(1,2,width,lenth)
-        #TODO: Gauuse voting
+        
         #since the field in 2 direction have the exactly since shape(euqual to the image)
         #we only need to iterate through one dim to get job done
         for field_u in self.displace_field[:,0]:
