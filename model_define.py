@@ -59,7 +59,7 @@ class Algin(nn.Module):
         self.offset_generator =  nn.ModuleList()
         '''
         offset generate conv layer  
-        input: concat(internal offset feature,upsambled low level offset): tensor(N,2C,H/2**lv,W/2**lv)
+        input: concat(internal offset feature,upsambled low level offset): tensor(N,C+18,H/2**lv,W/2**lv)
                 or if LOWEST level:
                         internal offset feature:tensor(N,C,H/2**lv,W/2**lv)
         output: offset tensor(N,3*3*2,H,W)
@@ -78,14 +78,15 @@ class Algin(nn.Module):
         out : aligned feature: tensor(N,C,H/2**lv,W/2**lv)
         '''
         self.displace_field_predict_offset_bottleneck = nn.Conv2d(2*internal_channel,internal_channel,3,padding=1)
-        self.displace_field_predict_offset_generator = nn.Conv2d(2*internal_channel,36,3,padding=1)
+        self.displace_field_predict_offset_generator = nn.Conv2d(internal_channel+18,36,3,padding=1)
         self.displace_field_predict_deform_conv = DeformConv2d(internal_channel,2,3,padding=1,deform_groups=2)
         for i in range(self.level):
-            input_channel = internal_channel if i==self.level-1 else 2*internal_channel
+            input_channel_offset = internal_channel if i==self.level-1 else internal_channel+18
+            input_channel_fea = internal_channel if i==self.level-1 else 2*internal_channel
             self.offset_bottleneck.append(nn.Conv2d(2*internal_channel,internal_channel,3,padding=1))
-            self.offset_generator.append(nn.Conv2d(input_channel,18,3,padding=1))
+            self.offset_generator.append(nn.Conv2d(input_channel_offset,18,3,padding=1))
             self.deformable_conv.append(DeformConv2d(internal_channel,internal_channel,3,padding=1))
-            self.feature_conv.append(nn.Conv2d(input_channel,internal_channel,3,padding=1))
+            self.feature_conv.append(nn.Conv2d(input_channel_fea,internal_channel,3,padding=1))
     
     def forward(self,ref_image,unreg_image):
         ref_data = Data(ref_image)
@@ -131,7 +132,11 @@ class DenoisedDataset(torch.utils.data.Dataset):
         return None
 
     def __getitem__(self,idx):
-        imgpath = self.imgdir + f'{idx}.tif'
+        gd_path = self.imgdir + f'ground_truth/{idx}.tif'
+        unreg_path = self.imgdir + f'wrapped_image/{idx}.tif'
+        gd = torch.from_numpy(tiff_read(gd_path))
+        unreg_image = torch.from_numpy(tiff_read(unreg_path))
+        return unreg_image, gd
     
 if __name__ == "__main__":
     print('model_define as main')
