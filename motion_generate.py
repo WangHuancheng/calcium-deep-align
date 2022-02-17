@@ -3,8 +3,8 @@ from torch import Tensor
 import torchfields
 import torchvision.transforms as T
 from PIL import Image
-from line_profiler import LineProfiler
-import random
+from tifffile import imread as tiff_read
+from tifffile import imwrite as tiff_write
 class MotionGenerator(torch.nn.Module):
     def __init__(self, num_init_vector:int,width=512,lenth=512,magnitude=1) -> None:
         """Generate random motion for 2D map,from sevral random vector,using Gaussian smooth voitng 
@@ -27,9 +27,9 @@ class MotionGenerator(torch.nn.Module):
         result = (-distance).exp()
         return result
 
-    def forward(self,displace_field) -> torch.field:
+    def forward(self) -> torch.field:
         #TODO: regular magnitude of init vector
-        self.displace_field = displace_field
+        
         self.displace_field = torch.zeros(1,2,self.width,self.lenth)
         self.init_vectors = torch.randn(2,self.num_init_vector)/ ((self.lenth+self.width)/32) * self.magnitude
         self.x_coord= torch.randint(0,self.width,(self.num_init_vector,))
@@ -50,6 +50,7 @@ class MotionGenerator(torch.nn.Module):
 
 if __name__ == "__main__":
     #generate grid to visualize displacement field
+    '''
     width = 512
     lenth = 512
     grid = torch.ones((width,lenth))
@@ -65,4 +66,14 @@ if __name__ == "__main__":
     result=result.to(torch.uint8)
     result_img = T.ToPILImage(mode='L')(result)
     result_img.show()
-    
+    '''
+    ima = torch.from_numpy(tiff_read('data/ground_truth/1.tif'))
+    max = torch.max(ima,0)[0]
+    max = torch.max(max,0)[0]
+    ima/=max
+    g = MotionGenerator(1,magnitude=1)
+    displace_field = g()
+    torch.save(displace_field,'data/df1.pt')
+    warpped_img = displace_field(ima)
+    warpped_img*=max
+    tiff_write('data/wrapped_image/1_wrapped.tif',warpped_img.numpy(),imagej=True)
