@@ -13,29 +13,34 @@ import numpy
 class FeatureExtraction(nn.Module): # return feature_lv1,feature_lv2,feature_lv3
     def __init__(self,origin_channel,internal_channel=16,lv=3) -> None:
         super().__init__()
-        self.relu = nn.ReLU()
+        self.relu = nn.LeakyReLU(0.1,inplace=True)
         self.level = lv
         self.feature_layer = nn.ModuleList()
         self.feature = []
         self.max_pool = nn.MaxPool2d(kernel_size=3,stride=2,padding=1)
         self.origin_channel = origin_channel
         for i in range(self.level):
-            input_channel = origin_channel if i==0 else internal_channel
-            feature_block = nn.Sequential(
-                                nn.Conv2d(input_channel,internal_channel,3,padding=1),
+            if i == 0:
+                feature_block = nn.Conv2d(2*origin_channel,internal_channel,1)
+            else:
+                feature_block = nn.Sequential(
+                                nn.Conv2d(internal_channel,internal_channel,3,padding=1),
                                 self.relu,
                                 nn.Conv2d(internal_channel,internal_channel,3,padding=1),
                                 self.relu
-                            )
+                                )
             self.feature_layer.append(feature_block)
-            self.feature.append('python list sucks')
     
-    def forward(self,origin_image):
+    def forward(self,unreg_image,ref_image):
+        
         for i in range(self.level):
-            if i==0:
-                self.feature[i]=self.feature_layer[i](origin_image)
+            if i == 0:
+                self.feature.append(torch.concat((unreg_image,ref_image),dim=1))
+                self.feature[0] = self.feature_layer[0](self.feature[0])
             else:
-                self.feature[i]=self.max_pool(self.feature_layer[i](self.feature[i-1]))
+                self.feature.append(self.feature[i-1])
+                self.feature[i] += self.feature_layer[i](self.feature[i])
+                self.feature[i] = self.max_pool(self.feature[i])
         return self.feature
             
 class Data(object):
@@ -125,9 +130,10 @@ if __name__ == "__main__":
     t = torch.rand(2,1,64,64)
     t2 = torch.rand(2,1,64,64)
     print(t)
-    y = f(t)
+    y = f(t,t2)
     for fe in y:
         print(fe.shape)
+    '''
     g = Algin(1)
     u = g(t,t2)
     loss_fn = nn.CrossEntropyLoss()
@@ -140,4 +146,4 @@ if __name__ == "__main__":
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
-
+'''
