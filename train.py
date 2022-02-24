@@ -50,4 +50,5 @@ if __name__ == "__main__":
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
+    print("done")
     
