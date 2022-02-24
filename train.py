@@ -20,34 +20,44 @@ class DataSet1Train(torch.utils.data.Dataset):
         groud_truth_path = f'{self.img_dir }/gd/{idx}_gd.tif'
         unreg_path = f'{self.img_dir}/wrapped/{idx}_wrapped.tif'
         gd = torch.from_numpy(tiff_read(groud_truth_path))
-        max = torch.max(gd,0)[0]
-        max = torch.max(max,0)[0]
-        gd/=max
+        m1 = torch.max(gd,0)[0]
+        m1 = torch.max(m1,0)[0]
+        gd/=m1
         unreg_image = torch.from_numpy(tiff_read(unreg_path))
-        max = torch.max(unreg_image,0)[0]
-        max = torch.max(max,0)[0]
-        unreg_image/=max
+        m2 = torch.max(unreg_image,0)[0]
+        m2 = torch.max(m2,0)[0]
+        unreg_image/=m2
         
-        return unreg_image.unsqueeze(0), gd.unsqueeze(0)
+        return unreg_image.unsqueeze(0), gd.unsqueeze(0),m1,m2
 def fuckfield():
     pass
 if __name__ == "__main__":
 
     print('trainning align model')
-    train_data = DataSet1Train('data/dataset1/train')
-    train_dataloader = DataLoader(train_data, batch_size=64, shuffle=True)
-    train_features, train_labels = next(iter(train_dataloader))
-    print(f'train_features:{train_features.size()}')
-    print(f'train_labels:{train_labels.size()}')
+    train_data = DataSet1Train('dataset1/train')
+    train_dataloader = DataLoader(train_data, batch_size=32, shuffle=True)
     model = Algin(1)
+    model = model.cuda()
+    print(f'model:{torch.cuda.memory_allocated()}')
     loss_fn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(),lr=1e-3)
-    predict_field = model(train_labels,train_features).field()
-    print(f'predict_field{predict_field.size()}')
-    x_predict = predict_field(train_features)
-    print(f'x_predict:{x_predict.size()}')
-    loss = loss_fn(x_predict,train_labels)
-    optimizer.zero_grad()
-    loss.backward()
-    optimizer.step()
-    
+    for train_features, train_labels,m1,m2 in train_dataloader:
+        train_features = train_features.cuda()
+        train_labels = train_labels.cuda()
+        m1 = m1.cuda()
+        print(f'data:{torch.cuda.memory_allocated()}')
+        predict_field = model(train_labels,train_features).field()
+        #print(f'predict_field{predict_field.size()}')
+        x_predict = predict_field(train_features)
+        #print(f'x_predict:{x_predict.size()}')
+        loss = loss_fn(x_predict,train_labels)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+    print("done")
+
+    result = []
+    result.append(loss.mean().item())
+    torch.save(model,'model.pth')
+    x_predict*=m1
+    tiff_write(f'dataset1/visual.tif',x_predict[0,0].cpu().numpy(),imagej=True)
