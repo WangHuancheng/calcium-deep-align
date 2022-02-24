@@ -52,20 +52,6 @@ class Algin(nn.Module):
         self.level=lv
         self.feature_extraction = FeatureExtraction(original_channel,internal_channel) #feature -> [tensor(N,C,H,W),]
         
-        self.offset_bottleneck =  nn.ModuleList()
-        '''
-        offset bottleneck conv layer  
-        input: concat(reference image feature ,unreg image feature): tensor(N,2C,H/2**lv,W/2**lv)
-        output: internal offset feature :tensor(N,C,H,W)
-        '''
-        self.offset_generator =  nn.ModuleList()
-        '''
-        offset generate conv layer  
-        input: concat(internal offset feature,upsambled low level offset): tensor(N,C+18,H/2**lv,W/2**lv)
-                or if LOWEST level:
-                        internal offset feature:tensor(N,C,H/2**lv,W/2**lv)
-        output: offset tensor(N,3*3*2,H,W)
-        '''
         self.deformable_conv = nn.ModuleList()
         '''
         input: unreg image feature: tensor(N,C,H/2**lv,W/2**lv),  
@@ -97,12 +83,13 @@ class Algin(nn.Module):
         aligned_data.offset = []
         ref_data.feature =  self.feature_extraction(ref_data.image) 
         unreg_data.feature = self.feature_extraction(unreg_data.image)
-        
+        print(f'extract:{torch.cuda.memory_allocated()}')
         #init list
         for i in range(self.level):
             aligned_data.offset.append(torch.cat((ref_data.feature[i],unreg_data.feature[i]),dim=1))
             aligned_data.feature.append('python list sucks')
         #upsamble
+        print(f'list:{torch.cuda.memory_allocated()}')
         for i in range(self.level-1,-1,-1):
             #deform conv
             aligned_data.offset[i]=self.relu(self.offset_bottleneck[i](aligned_data.offset[i]))
@@ -120,7 +107,8 @@ class Algin(nn.Module):
                 upsambled_lower_level_feature = functional.interpolate(aligned_data.feature[i+1],scale_factor=2,mode='bilinear') 
                 internal_feature = torch.cat((aligned_data.feature[i],upsambled_lower_level_feature),dim=1)
             aligned_data.feature[i] = self.relu(self.feature_conv[i](internal_feature))
-        #final field 
+        #final field
+        print(f'conv:{torch.cuda.memory_allocated()}')
         displace_field_offset = self.displace_field_predict_offset_bottleneck(
                         torch.concat((ref_data.feature[0],aligned_data.feature[0]),dim=1))
         displace_field_offset = self.displace_field_predict_offset_generator(

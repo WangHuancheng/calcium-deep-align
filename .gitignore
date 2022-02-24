@@ -3,3 +3,4 @@
 /data
 torchfields/meta.yaml
 __pycache__/motion_generate.cpython-39.pyc
+*.tif
