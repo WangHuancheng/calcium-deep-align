@@ -5,6 +5,7 @@ import torchvision.transforms as T
 from PIL import Image
 from tifffile import imread as tiff_read
 from tifffile import imwrite as tiff_write
+from tqdm import trange
 class MotionGenerator(torch.nn.Module):
     def __init__(self, num_init_vector:int,width=512,lenth=512,magnitude=1) -> None:
         """Generate random motion for 2D map,from sevral random vector,using Gaussian smooth voitng 
@@ -65,15 +66,27 @@ if __name__ == "__main__":
     result *=255
     result=result.to(torch.uint8)
     result_img = T.ToPILImage(mode='L')(result)
-    result_img.show()
     '''
-    ima = torch.from_numpy(tiff_read('data/ground_truth/1.tif'))
-    max = torch.max(ima,0)[0]
-    max = torch.max(max,0)[0]
-    ima/=max
-    g = MotionGenerator(1,magnitude=1)
-    displace_field = g()
-    torch.save(displace_field,'data/df1.pt')
-    warpped_img = displace_field(ima)
-    warpped_img*=max
-    tiff_write('data/wrapped_image/1_wrapped.tif',warpped_img.numpy(),imagej=True)
+    g = MotionGenerator(10,magnitude=1)
+    for i in trange(1,4801):
+        ima = tiff_read(f'data/ground_truth/{i}.tif')
+        tiff_write(f'data/dataset1/train/gd/{i}_gd.tif',ima,imagej=True)
+        ima = torch.from_numpy(ima)
+        max = torch.max(ima,0)[0]
+        max = torch.max(max,0)[0]
+        ima/=max
+        displace_field = g()
+        warpped_img = displace_field(ima)
+        warpped_img*=max
+        tiff_write(f'data/dataset1/train/wrapped/{i}_wrapped.tif',warpped_img.numpy(),imagej=True)
+    for i in trange(4801,6001):
+        ima = tiff_read(f'data/ground_truth/{i}.tif')
+        tiff_write(f'data/dataset1/test/gd/{i}_gd.tif',ima,imagej=True)
+        ima = torch.from_numpy(ima)
+        max = torch.max(ima,0)[0]
+        max = torch.max(max,0)[0]
+        ima/=max
+        displace_field = g()
+        warpped_img = displace_field(ima)
+        warpped_img*=max
+        tiff_write(f'data/dataset1/test/wrapped/{i}_wrapped.tif',warpped_img.numpy(),imagej=True)
