@@ -34,7 +34,7 @@ if __name__ == "__main__":
 
     print('trainning align model')
     train_data = DataSet1Train('dataset1/train')
-    train_dataloader = DataLoader(train_data, batch_size=32, shuffle=True)
+    train_dataloader = DataLoader(train_data, batch_size=32, shuffle=True,pin_memory=True, num_workers=10)
     model = Algin(1)
     model = model.cuda()
     loss_fn = nn.CrossEntropyLoss()
