@@ -2,40 +2,62 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 import torchfields
-from mmcv.ops import DeformConv2d
 
-from matplotlib import pyplot as plt
-import torchvision.transforms
-from motion_generate import MotionGenerator
-import numpy
+class Conv2d_Bn_Relu(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, 
+        stride=1, padding=0, dilation=1, groups=1, bias=True,
+        padding_mode: str = 'zeros',device=None,dtype=None):
+        #args: same as torch.nn.Conv2d
+        super().__init__()
+        self.in_channels:int = in_channels
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride,
+                      padding=padding, dilation=dilation, groups=groups, bias=bias,
+                      padding_mode=padding_mode,device=device,dtype=dtype)
+        self.bn = nn.BatchNorm2d(in_channels)
+        self.relu = nn.ReLU(True)
+    def forward(self,x):
+        out = self.conv(x)
+        out = self.bn(out)
+        return self.relu(out) #relu is inplace
+class Conv2d_Bn_Tanh(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, 
+        stride=1, padding=0, dilation=1, groups=1, bias=True,
+        padding_mode: str = 'zeros',device=None,dtype=None):
+        #args: same as torch.nn.Conv2d
+        super().__init__()
+        self.in_channels:int = in_channels
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride,
+                      padding=padding, dilation=dilation, groups=groups, bias=bias,
+                      padding_mode=padding_mode,device=device,dtype=dtype)
+        self.bn = nn.BatchNorm2d(in_channels)
+        self.Tanh= nn.Tanh(True)
+    def forward(self,x):
+        out = self.conv(x)
+        out = self.bn(out)
+        return self.Tanh(out) #Tanh is inplace
 
-#TODO: Residual connection may required
 class FeatureExtraction(nn.Module): # return feature_lv1,feature_lv2,feature_lv3
-    def __init__(self,origin_channel,internal_channel=16,lv=3) -> None:
+    def __init__(self,origin_channel,internal_channel=16) -> None:
         super().__init__()
         self.relu = nn.ReLU()
-        self.level = lv
-        self.feature_layer = nn.ModuleList()
-        self.feature = []
+        self.level = 4
+        self.feature =[]
         self.max_pool = nn.MaxPool2d(kernel_size=3,stride=2,padding=1)
         self.origin_channel = origin_channel
-        for i in range(self.level):
-            input_channel = origin_channel if i==0 else internal_channel
-            feature_block = nn.Sequential(
-                                nn.Conv2d(input_channel,internal_channel,3,padding=1),
-                                self.relu,
-                                nn.Conv2d(internal_channel,internal_channel,3,padding=1),
-                                self.relu
-                            )
-            self.feature_layer.append(feature_block)
-            self.feature.append('python list sucks')
+        self.feature_layer_0 = nn.Sequential(Conv2d_Bn_Relu(origin_channel,internal_channel,3,padding=1),
+                                            Conv2d_Bn_Relu(internal_channel,internal_channel,3,padding=1))
+        self.feature_layer_1 = nn.Sequential(Conv2d_Bn_Relu(internal_channel,internal_channel,3,padding=1),
+                                            Conv2d_Bn_Relu(internal_channel,internal_channel,3,padding=1))
+        self.feature_layer_2 = nn.Sequential(Conv2d_Bn_Relu(internal_channel,internal_channel,3,padding=1),
+                                            Conv2d_Bn_Relu(internal_channel,internal_channel,3,padding=1))
+
     
     def forward(self,origin_image):
-        for i in range(self.level):
-            if i==0:
-                self.feature[i]=self.feature_layer[i](origin_image)
-            else:
-                self.feature[i]=self.max_pool(self.feature_layer[i](self.feature[i-1]))
+        self.feature.append(self.feature_layer_0(origin_image))
+        self.feature.append(self.self.max_pool(self.feature[0]))
+        self.feature[1] = self.feature_layer_1(self.feature[1])
+        self.feature.append(self.self.max_pool(self.feature[1]))
+        self.feature[2] = self.feature_layer_2(self.feature[2])
         return self.feature
             
 class Data(object):
@@ -51,70 +73,35 @@ class Algin(nn.Module):
         self.relu = nn.ReLU()
         self.level=lv
         self.feature_extraction = FeatureExtraction(original_channel,internal_channel) #feature -> [tensor(N,C,H,W),]
+        self.field_predict_layer_0 = nn.Sequential(Conv2d_Bn_Relu(internal_channel*2,internal_channel,3,padding=1),
+                                            Conv2d_Bn_Tanh(internal_channel,2,3,padding=1))
+        self.field_predict_layer_1 = nn.Sequential(Conv2d_Bn_Relu(internal_channel*2+2,internal_channel,3,padding=1),
+                                            Conv2d_Bn_Tanh(internal_channel,2,3,padding=1))
+        self.field_predict_layer_2 = nn.Sequential(Conv2d_Bn_Relu(internal_channel*2+2,internal_channel,3,padding=1),
+                                            Conv2d_Bn_Tanh(internal_channel,2,3,padding=1))
+        self.field = [0,0,0]
         
-        self.deformable_conv = nn.ModuleList()
-        '''
-        input: unreg image feature: tensor(N,C,H/2**lv,W/2**lv),  
-               offset: tensor(N,3*3*2,H,W)
-        out: internal feature: tensor(N,C,H/2**lv,W/2**lv)
-        '''
-        self.feature_conv = nn.ModuleList()
-        '''
-        input : concat(internal feature,upsambled lower level aligned feature): tensor(N,2C,H/2**lv,W/2**lv)
-                or if LOWEST level:
-                    internal feature:tensor(N,C,H/2**lv,W/2**lv)
-        out : aligned feature: tensor(N,C,H/2**lv,W/2**lv)
-        '''
-        self.displace_field_predict_offset_bottleneck = nn.Conv2d(2*internal_channel,internal_channel,3,padding=1)
-        self.displace_field_predict_offset_generator = nn.Conv2d(internal_channel+18,36,3,padding=1)
-        self.displace_field_predict_deform_conv = DeformConv2d(internal_channel,2,3,padding=1,deform_groups=2)
-        for i in range(self.level):
-            input_channel_offset = internal_channel if i==self.level-1 else internal_channel+18
-            input_channel_fea = internal_channel if i==self.level-1 else 2*internal_channel
-            self.offset_bottleneck.append(nn.Conv2d(2*internal_channel,internal_channel,3,padding=1))
-            self.offset_generator.append(nn.Conv2d(input_channel_offset,18,3,padding=1))
-            self.deformable_conv.append(DeformConv2d(internal_channel,internal_channel,3,padding=1))
-            self.feature_conv.append(nn.Conv2d(input_channel_fea,internal_channel,3,padding=1))
-    
     def forward(self,ref_image,unreg_image):
         ref_data = Data(ref_image)
         unreg_data = Data(unreg_image)
-        aligned_data = Data()
-        aligned_data.offset = []
+        
         ref_data.feature =  self.feature_extraction(ref_data.image) 
         unreg_data.feature = self.feature_extraction(unreg_data.image)
         print(f'extract:{torch.cuda.memory_allocated()}')
-        #init list
-        for i in range(self.level):
-            aligned_data.offset.append(torch.cat((ref_data.feature[i],unreg_data.feature[i]),dim=1))
-            aligned_data.feature.append('python list sucks')
-        #upsamble
-        print(f'list:{torch.cuda.memory_allocated()}')
-        for i in range(self.level-1,-1,-1):
-            #deform conv
-            aligned_data.offset[i]=self.relu(self.offset_bottleneck[i](aligned_data.offset[i]))
-            if i==self.level-1:
-                internal_offset_feature = aligned_data.offset[i]
-            else:
-                upsambled_lower_level_offset = functional.interpolate(aligned_data.offset[i+1],scale_factor=2,mode='bilinear') 
-                internal_offset_feature = torch.cat((aligned_data.offset[i],upsambled_lower_level_offset),dim=1)
-            aligned_data.offset[i] =self.relu(self.offset_generator[i](internal_offset_feature))
-            aligned_data.feature[i]= self.relu(self.deformable_conv[i](unreg_data.feature[i],aligned_data.offset[i]))
-            #fusion level
-            if i==self.level-1:
-                internal_feature = aligned_data.feature[i]
-            else:
-                upsambled_lower_level_feature = functional.interpolate(aligned_data.feature[i+1],scale_factor=2,mode='bilinear') 
-                internal_feature = torch.cat((aligned_data.feature[i],upsambled_lower_level_feature),dim=1)
-            aligned_data.feature[i] = self.relu(self.feature_conv[i](internal_feature))
+        self.field[2] = self.field_predict_layer_2(
+                    torch.cat((unreg_data.feature[2],ref_data.feature[2]))).field()
+        self.field[1] = functional.interpolate(self.field[2],scale_factor=2,mode='bilinear')
+        self.field[1] += self.field_predict_layer_1(
+                    torch.cat((unreg_data.feature[1],ref_data.feature[1],self.field[1]))).field()
+        self.field[0] = functional.interpolate(self.field[1],scale_factor=2,mode='bilinear')
+        self.field[0] += self.field_predict_layer_0(
+                    torch.cat((unreg_data.feature[0],ref_data.feature[0],self.field[1]))).field()
+        
+        
         #final field
         print(f'conv:{torch.cuda.memory_allocated()}')
-        displace_field_offset = self.displace_field_predict_offset_bottleneck(
-                        torch.concat((ref_data.feature[0],aligned_data.feature[0]),dim=1))
-        displace_field_offset = self.displace_field_predict_offset_generator(
-                                torch.cat((displace_field_offset,aligned_data.offset[0]),dim=1))
-        displace_field = self.displace_field_predict_deform_conv(aligned_data.feature[0],offset =displace_field_offset)
-        return displace_field
+        
+        return self.field[0]
           
 
     
@@ -124,7 +111,6 @@ if __name__ == "__main__":
     f = FeatureExtraction(1)
     t = torch.rand(2,1,64,64)
     t2 = torch.rand(2,1,64,64)
-    print(t)
     y = f(t)
     for fe in y:
         print(fe.shape)
