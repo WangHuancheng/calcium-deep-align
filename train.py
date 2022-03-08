@@ -41,6 +41,7 @@ if __name__ == "__main__":
     print(f'model:{torch.cuda.memory_allocated()}')
     loss_fn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(),lr=1e-3)
+
     for train_features, train_labels,m1,m2 in train_dataloader:
         train_features = train_features.cuda()
         train_labels = train_labels.cuda()
@@ -61,3 +62,4 @@ if __name__ == "__main__":
     torch.save(model,'model.pth')
     x_predict*=m1
     tiff_write(f'dataset1/visual.tif',x_predict[0,0].cpu().numpy(),imagej=True)
+
