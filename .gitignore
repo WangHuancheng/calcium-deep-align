@@ -5,3 +5,4 @@ torchfields/meta.yaml
 __pycache__/motion_generate.cpython-39.pyc
 *.tif
 *.pyc
+dataset1/train_gd.pt
