@@ -124,6 +124,6 @@ if __name__ == "__main__":
     print(f'x_predict:{x_predict.size()}')
     loss = loss_fn(x_predict,t2)
     optimizer.zero_grad()
-    loss.backward()
+    loss.backward(retain_graph=True)
     optimizer.step()
 
