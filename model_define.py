@@ -13,7 +13,7 @@ class Conv2d_Bn_Relu(nn.Module):
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride,
                       padding=padding, dilation=dilation, groups=groups, bias=bias,
                       padding_mode=padding_mode,device=device,dtype=dtype)
-        self.bn = nn.BatchNorm2d(in_channels)
+        self.bn = nn.BatchNorm2d(out_channels)
         self.relu = nn.ReLU(True)
     def forward(self,x):
         out = self.conv(x)
@@ -29,8 +29,8 @@ class Conv2d_Bn_Tanh(nn.Module):
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride,
                       padding=padding, dilation=dilation, groups=groups, bias=bias,
                       padding_mode=padding_mode,device=device,dtype=dtype)
-        self.bn = nn.BatchNorm2d(in_channels)
-        self.Tanh= nn.Tanh(True)
+        self.bn = nn.BatchNorm2d(out_channels)
+        self.Tanh= nn.Tanh()
     def forward(self,x):
         out = self.conv(x)
         out = self.bn(out)
@@ -54,9 +54,9 @@ class FeatureExtraction(nn.Module): # return feature_lv1,feature_lv2,feature_lv3
     
     def forward(self,origin_image):
         self.feature.append(self.feature_layer_0(origin_image))
-        self.feature.append(self.self.max_pool(self.feature[0]))
+        self.feature.append(self.max_pool(self.feature[0]))
         self.feature[1] = self.feature_layer_1(self.feature[1])
-        self.feature.append(self.self.max_pool(self.feature[1]))
+        self.feature.append(self.max_pool(self.feature[1]))
         self.feature[2] = self.feature_layer_2(self.feature[2])
         return self.feature
             
@@ -73,11 +73,11 @@ class Algin(nn.Module):
         self.relu = nn.ReLU()
         self.level=lv
         self.feature_extraction = FeatureExtraction(original_channel,internal_channel) #feature -> [tensor(N,C,H,W),]
-        self.field_predict_layer_0 = nn.Sequential(Conv2d_Bn_Relu(internal_channel*2,internal_channel,3,padding=1),
+        self.field_predict_layer_0 = nn.Sequential(Conv2d_Bn_Relu(internal_channel*2+2,internal_channel,3,padding=1),
                                             Conv2d_Bn_Tanh(internal_channel,2,3,padding=1))
         self.field_predict_layer_1 = nn.Sequential(Conv2d_Bn_Relu(internal_channel*2+2,internal_channel,3,padding=1),
                                             Conv2d_Bn_Tanh(internal_channel,2,3,padding=1))
-        self.field_predict_layer_2 = nn.Sequential(Conv2d_Bn_Relu(internal_channel*2+2,internal_channel,3,padding=1),
+        self.field_predict_layer_2 = nn.Sequential(Conv2d_Bn_Relu(internal_channel*2,internal_channel,3,padding=1),
                                             Conv2d_Bn_Tanh(internal_channel,2,3,padding=1))
         self.field = [0,0,0]
         
@@ -89,13 +89,13 @@ class Algin(nn.Module):
         unreg_data.feature = self.feature_extraction(unreg_data.image)
         print(f'extract:{torch.cuda.memory_allocated()}')
         self.field[2] = self.field_predict_layer_2(
-                    torch.cat((unreg_data.feature[2],ref_data.feature[2]))).field()
+                    torch.cat((unreg_data.feature[2],ref_data.feature[2]),dim=1)).field()
         self.field[1] = functional.interpolate(self.field[2],scale_factor=2,mode='bilinear')
         self.field[1] += self.field_predict_layer_1(
-                    torch.cat((unreg_data.feature[1],ref_data.feature[1],self.field[1]))).field()
+                    torch.cat((unreg_data.feature[1],ref_data.feature[1],self.field[1]),dim=1)).field()
         self.field[0] = functional.interpolate(self.field[1],scale_factor=2,mode='bilinear')
         self.field[0] += self.field_predict_layer_0(
-                    torch.cat((unreg_data.feature[0],ref_data.feature[0],self.field[1]))).field()
+                    torch.cat((unreg_data.feature[0],ref_data.feature[0],self.field[0]),dim=1)).field()
         
         
         #final field
