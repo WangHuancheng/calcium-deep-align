@@ -17,8 +17,8 @@ class DataSet1Train(torch.utils.data.Dataset):
         return 4800
 
     def __getitem__(self,idx):
-        groud_truth_path = f'{self.img_dir }/gd/{idx}_gd.tif'
-        unreg_path = f'{self.img_dir}/wrapped/{idx}_wrapped.tif'
+        groud_truth_path = f'{self.img_dir }/gd/{idx+1}_gd.tif'
+        unreg_path = f'{self.img_dir}/wrapped/{idx+1}_wrapped.tif'
         gd = torch.from_numpy(tiff_read(groud_truth_path))
         m1 = torch.max(gd,0)[0]
         m1 = torch.max(m1,0)[0]
