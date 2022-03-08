@@ -14,12 +14,11 @@ class Conv2d_Bn_Relu(nn.Module):
                       padding=padding, dilation=dilation, groups=groups, bias=bias,
                       padding_mode=padding_mode,device=device,dtype=dtype)
         self.bn = nn.BatchNorm2d(out_channels)
-        self.relu = nn.ReLU()
+        self.relu = nn.ReLU(True)
     def forward(self,x):
-        out_conv = self.conv(x)
-        out_bn = self.bn(out_conv)
-        out = self.relu(out_bn)
-        return out 
+        out = self.conv(x)
+        out = self.bn(out)
+        return self.relu(out) #relu is inplace
 class Conv2d_Bn_Tanh(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, 
         stride=1, padding=0, dilation=1, groups=1, bias=True,
@@ -31,12 +30,11 @@ class Conv2d_Bn_Tanh(nn.Module):
                       padding=padding, dilation=dilation, groups=groups, bias=bias,
                       padding_mode=padding_mode,device=device,dtype=dtype)
         self.bn = nn.BatchNorm2d(out_channels)
-        self.tanh= nn.Tanh()
+        self.Tanh= nn.Tanh()
     def forward(self,x):
-        out_conv = self.conv(x)
-        out_bn = self.bn(out_conv)
-        out = self.tanh(out_bn)
-        return out 
+        out = self.conv(x)
+        out = self.bn(out)
+        return self.Tanh(out) #Tanh is inplace
 
 class FeatureExtraction(nn.Module): # return feature_lv1,feature_lv2,feature_lv3
     def __init__(self,origin_channel,internal_channel=16) -> None:
@@ -46,20 +44,20 @@ class FeatureExtraction(nn.Module): # return feature_lv1,feature_lv2,feature_lv3
         self.feature =[]
         self.max_pool = nn.MaxPool2d(kernel_size=3,stride=2,padding=1)
         self.origin_channel = origin_channel
-        self.feature = [0,0,0]
         self.feature_layer_0 = nn.Sequential(Conv2d_Bn_Relu(origin_channel,internal_channel,3,padding=1),
                                             Conv2d_Bn_Relu(internal_channel,internal_channel,3,padding=1))
         self.feature_layer_1 = nn.Sequential(Conv2d_Bn_Relu(internal_channel,internal_channel,3,padding=1),
                                             Conv2d_Bn_Relu(internal_channel,internal_channel,3,padding=1))
         self.feature_layer_2 = nn.Sequential(Conv2d_Bn_Relu(internal_channel,internal_channel,3,padding=1),
                                             Conv2d_Bn_Relu(internal_channel,internal_channel,3,padding=1))
-                                            
 
     
     def forward(self,origin_image):
-        self.feature[0]=self.feature_layer_0(origin_image)
-        self.feature[1]=self.feature_layer_1(self.max_pool(self.feature[0]))
-        self.feature[2] = self.feature_layer_2(self.max_pool(self.feature[1]))
+        self.feature.append(self.feature_layer_0(origin_image))
+        self.feature.append(self.max_pool(self.feature[0]))
+        self.feature[1] = self.feature_layer_1(self.feature[1])
+        self.feature.append(self.max_pool(self.feature[1]))
+        self.feature[2] = self.feature_layer_2(self.feature[2])
         return self.feature
             
 class Data(object):
@@ -89,19 +87,19 @@ class Algin(nn.Module):
         
         ref_data.feature =  self.feature_extraction(ref_data.image) 
         unreg_data.feature = self.feature_extraction(unreg_data.image)
-        #print(f'extract:{torch.cuda.memory_allocated()}')
+        print(f'extract:{torch.cuda.memory_allocated()}')
         self.field[2] = self.field_predict_layer_2(
-                    torch.cat((unreg_data.feature[2],ref_data.feature[2]),dim=1))
-        upsambled_field_1 = functional.interpolate(self.field[2],scale_factor=2,mode='bilinear')
-        self.field[1] = upsambled_field_1+self.field_predict_layer_1(
-                    torch.cat((unreg_data.feature[1],ref_data.feature[1],upsambled_field_1),dim=1))
-        upsambled_field_0 = functional.interpolate(self.field[1],scale_factor=2,mode='bilinear')
-        self.field[0] = upsambled_field_0+self.field_predict_layer_0(
-                    torch.cat((unreg_data.feature[0],ref_data.feature[0],upsambled_field_0),dim=1))
+                    torch.cat((unreg_data.feature[2],ref_data.feature[2]),dim=1)).field()
+        self.field[1] = functional.interpolate(self.field[2],scale_factor=2,mode='bilinear')
+        self.field[1] += self.field_predict_layer_1(
+                    torch.cat((unreg_data.feature[1],ref_data.feature[1],self.field[1]),dim=1)).field()
+        self.field[0] = functional.interpolate(self.field[1],scale_factor=2,mode='bilinear')
+        self.field[0] += self.field_predict_layer_0(
+                    torch.cat((unreg_data.feature[0],ref_data.feature[0],self.field[0]),dim=1)).field()
         
         
         #final field
-        #print(f'conv:{torch.cuda.memory_allocated()}')
+        print(f'conv:{torch.cuda.memory_allocated()}')
         
         return self.field[0]
           
