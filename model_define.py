@@ -14,11 +14,12 @@ class Conv2d_Bn_Relu(nn.Module):
                       padding=padding, dilation=dilation, groups=groups, bias=bias,
                       padding_mode=padding_mode,device=device,dtype=dtype)
         self.bn = nn.BatchNorm2d(out_channels)
-        self.relu = nn.ReLU(True)
+        self.relu = nn.ReLU()
     def forward(self,x):
-        out = self.conv(x)
-        out = self.bn(out)
-        return self.relu(out) #relu is inplace
+        out_conv = self.conv(x)
+        out_bn = self.bn(out_conv)
+        out = self.relu(out_bn)
+        return out 
 class Conv2d_Bn_Tanh(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, 
         stride=1, padding=0, dilation=1, groups=1, bias=True,
@@ -32,9 +33,10 @@ class Conv2d_Bn_Tanh(nn.Module):
         self.bn = nn.BatchNorm2d(out_channels)
         self.Tanh= nn.Tanh()
     def forward(self,x):
-        out = self.conv(x)
-        out = self.bn(out)
-        return self.Tanh(out) #Tanh is inplace
+        out_conv = self.conv(x)
+        out_bn = self.bn(out_conv)
+        out = self.Tanh(out_bn)
+        return out 
 
 class FeatureExtraction(nn.Module): # return feature_lv1,feature_lv2,feature_lv3
     def __init__(self,origin_channel,internal_channel=16) -> None:
@@ -90,10 +92,10 @@ class Algin(nn.Module):
         self.field[2] = self.field_predict_layer_2(
                     torch.cat((unreg_data.feature[2],ref_data.feature[2]),dim=1)).field()
         upsambled_feature_2 = functional.interpolate(self.field[2],scale_factor=2,mode='bilinear')
-        self.field[1] += self.field_predict_layer_1(
-                    torch.cat((unreg_data.feature[1],ref_data.feature[1],upsambled_feature_2),dim=1)).field()
+        self.field[1] = upsambled_feature_2+self.field_predict_layer_1(
+                    torch.cat((unreg_data.feature[1],ref_data.feature[1],upsambled_feature_2),dim=1))
         upsambled_feature_1 = functional.interpolate(self.field[1],scale_factor=2,mode='bilinear')
-        self.field[0] += self.field_predict_layer_0(
+        self.field[0] = upsambled_feature_1+self.field_predict_layer_0(
                     torch.cat((unreg_data.feature[0],ref_data.feature[0],upsambled_feature_1),dim=1)).field()
                     
         return self.field[0]

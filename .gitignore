@@ -7,4 +7,4 @@ __pycache__/motion_generate.cpython-39.pyc
 *.pyc
 *.pt
 __pycache__/*
-
+*.pth

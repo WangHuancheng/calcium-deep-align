@@ -8,7 +8,8 @@ from model_define import Algin
 from torch.utils.data import DataLoader
 import torchfields
 from torchinfo import summary
-from tqdm import tqdm
+from tqdm import tqdm, trange
+import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
 
@@ -19,28 +20,35 @@ if __name__ == "__main__":
     wrapped /=2455
     print('data loaded')
     dataset=torch.utils.data.TensorDataset(wrapped,gd)
-    train_dataloader = torch.utils.data.DataLoader(dataset,batch_size=32,num_workers=20)
+    train_dataloader = torch.utils.data.DataLoader(dataset,batch_size=64,num_workers=20)
     model = Algin(1)
     model = model.cuda(1)
     loss_fn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(),lr=1e-3)
-    pbar = tqdm(total=4800)
-    for train_features, train_labels in train_dataloader:
-        train_features = train_features.cuda(1)
-        train_labels = train_labels.cuda(1)
-        predict_field = model(train_labels,train_features).field()
-        x_predict = predict_field(train_features)
-        loss = loss_fn(x_predict,train_labels)
-        optimizer.zero_grad()
-        loss.backward(retain_graph=True)
-        optimizer.step()
-        pbar.update(32)
-    print("done")
-    pbar.close()
-
     result = []
-    result.append(loss.mean().item())
-    torch.save(model,'model.pth')
-    x_predict*=2455
-    tiff_write(f'dataset1/visual.tif',x_predict[0,0].cpu().numpy(),imagej=True)
+    for i in trange(1000):
+        for train_features, train_labels in train_dataloader:
+            train_features = train_features.cuda(1)
+            train_labels = train_labels.cuda(1)
+            predict_field = model(train_labels,train_features).field()
+            x_predict = predict_field(train_features)
+            loss = loss_fn(x_predict,train_labels)
+            optimizer.zero_grad()
+            loss.backward(retain_graph=True)
+            optimizer.step()
+        current_result = loss.mean().item()
+        result.append(current_result)
+        if i==0 or current_result<best_result:
+            best_result = current_result
+            torch.save(model,'best_model.pth')
+            x_predict*=2455
+            tiff_write(f'dataset1/visual.tif',x_predict[0,0].cpu().detach().numpy(),imagej=True)
+        if i+1 % 100 == 0:
+            torch.save(model,f'{i+1}_model.pth')
+            x_predict*=2455
+            tiff_write(f'dataset1/visual.tif',x_predict[0,0].cpu().detach().numpy(),imagej=True)
+            
+    x_axis = [i for i in range(1000)]
+    plt.plot(x_axis,result)
+    plt.savefig('loss.png')
 
