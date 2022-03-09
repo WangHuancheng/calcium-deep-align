@@ -6,5 +6,5 @@ __pycache__/motion_generate.cpython-39.pyc
 *.tif
 *.pyc
 *.pt
-
+__pycache__/*
 
