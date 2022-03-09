@@ -18,7 +18,7 @@ def MyDataLoad():
 if __name__ == "__main__":
     #MyDataLoad()
     tensor = torch.load('dataset1/train_gd.pt')
-    tensor/=2455
+    tensor/=2455 #maxinum of grey value
     print('here')
     dataset=torch.utils.data.TensorDataset(tensor)
     
