@@ -8,7 +8,7 @@ from tqdm import trange
 
 def MyDataLoad():
     for i in trange(4800):
-        input=torch.from_numpy(tiff_read(f'data/dataset1/train/gd/{i+1}_gd.tif')).reshape(1,1,512,512)
+        input=torch.from_numpy(tiff_read(f'dataset1/train/wrapped/{i+1}_wra  pped.tif')).reshape(1,1,512,512)
         if(i==0):
             tensor=input
         else:
@@ -16,5 +16,10 @@ def MyDataLoad():
     torch.save(tensor,'tensor.pt')
 
 if __name__ == "__main__":
-    MyDataLoad()
+    #MyDataLoad()
+    tensor = torch.load('dataset1/train_gd.pt')
+    tensor/=2455
+    print('here')
+    dataset=torch.utils.data.TensorDataset(tensor)
+    
 
