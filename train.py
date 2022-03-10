@@ -20,10 +20,10 @@ if __name__ == "__main__":
     wrapped /=2455
     print('data loaded')
     dataset=torch.utils.data.TensorDataset(wrapped,gd)
-    train_dataloader = torch.utils.data.DataLoader(dataset,batch_size=64,num_workers=20)
+    train_dataloader = torch.utils.data.DataLoader(dataset,batch_size=32,num_workers=20)
     model = Algin(1)
     model = model.cuda(1)
-    loss_fn = nn.CrossEntropyLoss()
+    loss_fn = nn.MSELoss(reduction='sum')
     optimizer = torch.optim.Adam(model.parameters(),lr=1e-3)
     result = []
     for i in trange(1000):
@@ -36,19 +36,19 @@ if __name__ == "__main__":
             optimizer.zero_grad()
             loss.backward(retain_graph=True)
             optimizer.step()
-        current_result = loss.mean().item()
+        current_result = loss.item()
         result.append(current_result)
         if i==0 or current_result<best_result:
             best_result = current_result
-            torch.save(model,'best_model.pth')
-            x_predict*=2455
-            tiff_write(f'dataset1/visual.tif',x_predict[0,0].cpu().detach().numpy(),imagej=True)
+            torch.save(model,f'best_model_{i+1}.pth')
+            tiff_write(f'dataset1/best_{i+1}_input.tif',train_features[0,0].cpu().detach().numpy()*2455,imagej=True)
+            tiff_write(f'dataset1/best_{i+1}_output.tif',x_predict[0,0].cpu().detach().numpy()*2455,imagej=True)
+            tiff_write(f'dataset1/best_{i+1}gd.tif',train_labels[0,0].cpu().detach().numpy()*2455,imagej=True)
         if i+1 % 100 == 0:
             torch.save(model,f'{i+1}_model.pth')
-            x_predict*=2455
-            tiff_write(f'dataset1/visual.tif',x_predict[0,0].cpu().detach().numpy(),imagej=True)
-            
+            tiff_write(f'dataset1/{i+1}_input.tif',train_features[0,0].cpu().detach().numpy()*2455,imagej=True)
+            tiff_write(f'dataset1/{i+1}_output.tif',x_predict[0,0].cpu().detach().numpy()*2455,imagej=True)
+            tiff_write(f'dataset1/{i+1}gd.tif',train_labels[0,0].cpu().detach().numpy()*2455,imagej=True)
     x_axis = [i for i in range(1000)]
     plt.plot(x_axis,result)
     plt.savefig('loss.png')
-
