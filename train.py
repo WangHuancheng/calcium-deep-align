@@ -40,15 +40,16 @@ if __name__ == "__main__":
         result.append(current_result)
         if i==0 or current_result<best_result:
             best_result = current_result
-            torch.save(model,f'best_model_{i+1}.pth')
-            tiff_write(f'dataset1/best_{i+1}_input.tif',train_features[0,0].cpu().detach().numpy()*2455,imagej=True)
-            tiff_write(f'dataset1/best_{i+1}_output.tif',x_predict[0,0].cpu().detach().numpy()*2455,imagej=True)
-            tiff_write(f'dataset1/best_{i+1}gd.tif',train_labels[0,0].cpu().detach().numpy()*2455,imagej=True)
-        if i+1 % 100 == 0:
+            best_it = i+1
+            torch.save(model,f'best_model.pth')
+            tiff_write(f'dataset1/best_input.tif',train_features[0,0].cpu().detach().numpy()*2455,imagej=True)
+            tiff_write(f'dataset1/best_output.tif',x_predict[0,0].cpu().detach().numpy()*2455,imagej=True)
+            tiff_write(f'dataset1/best_gd.tif',train_labels[0,0].cpu().detach().numpy()*2455,imagej=True)
+        if (i+1) % 100 == 0:
             torch.save(model,f'{i+1}_model.pth')
             tiff_write(f'dataset1/{i+1}_input.tif',train_features[0,0].cpu().detach().numpy()*2455,imagej=True)
             tiff_write(f'dataset1/{i+1}_output.tif',x_predict[0,0].cpu().detach().numpy()*2455,imagej=True)
-            tiff_write(f'dataset1/{i+1}gd.tif',train_labels[0,0].cpu().detach().numpy()*2455,imagej=True)
+            tiff_write(f'dataset1/{i+1}_gd.tif',train_labels[0,0].cpu().detach().numpy()*2455,imagej=True)
     x_axis = [i for i in range(1000)]
     plt.plot(x_axis,result)
-    plt.savefig('loss.png')
+    plt.savefig(f'loss_{best_it}is_the_best.png')
