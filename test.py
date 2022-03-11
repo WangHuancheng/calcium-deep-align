@@ -14,7 +14,6 @@ if __name__ == "__main__":
     with torch.no_grad():
         model = torch.load('best_model.pth')
         model = model.eval()
-        model = model.cuda(1)
         print('model loaded')
         test_gd = torch.load('dataset1/test_gd.pt')
         test_gd/=2455 #maxinum of grey value
@@ -27,8 +26,6 @@ if __name__ == "__main__":
         loss = 0
         loss_input = 0
         for train_features, train_labels in test_dataloader:
-            train_features = train_features.cuda(1)
-            train_labels = train_labels.cuda(1)
             predict_field = model(train_labels,train_features).field()
             x_predict = predict_field(train_features)
             loss += loss_fn(x_predict,train_labels)
@@ -51,8 +48,6 @@ if __name__ == "__main__":
         loss = 0
         loss_input=0
         for train_features, train_labels in test_dataloader:
-            train_features = train_features.cuda(1)
-            train_labels = train_labels.cuda(1)
             predict_field = model(train_labels,train_features).field()
             x_predict = predict_field(train_features)
             loss += loss_fn(x_predict,train_labels)
