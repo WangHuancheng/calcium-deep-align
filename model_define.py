@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 import torchfields
+import ncc
 
 class Conv2d_Bn_Relu(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, 
@@ -105,20 +106,16 @@ class Algin(nn.Module):
 if __name__ == "__main__":
     print('model_define as main')
     #test FeatureExtraction block
-    f = FeatureExtraction(1)
-    t = torch.rand(2,1,64,64)
+    t1 = torch.rand(2,1,64,64)
     t2 = torch.rand(2,1,64,64)
-    y = f(t)
-    for fe in y:
-        print(fe.shape)
+
     g = Algin(1)
-    u = g(t,t2)
-    loss_fn = nn.CrossEntropyLoss()
+    loss_fn = ncc.NCC()
     optimizer = torch.optim.Adam(g.parameters(),lr=1e-3)
+    u = g(t1,t2)
     predict_field = u.field()
-    print(f'predict_field{predict_field.size()}')
-    x_predict = predict_field(t)
-    print(f'x_predict:{x_predict.size()}')
+
+    x_predict = predict_field(t1)
     loss = loss_fn(x_predict,t2)
     optimizer.zero_grad()
     loss.backward(retain_graph=True)

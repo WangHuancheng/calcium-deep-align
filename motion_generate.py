@@ -6,6 +6,7 @@ from PIL import Image
 from tifffile import imread as tiff_read
 from tifffile import imwrite as tiff_write
 from tqdm import trange
+
 class MotionGenerator(torch.nn.Module):
     def __init__(self, num_init_vector:int,width=512,lenth=512,magnitude=1) -> None:
         """Generate random motion for 2D map,from sevral random vector,using Gaussian smooth voitng 
@@ -51,7 +52,7 @@ class MotionGenerator(torch.nn.Module):
 
 if __name__ == "__main__":
     #generate grid to visualize displacement field
-    '''
+    
     width = 512
     lenth = 512
     grid = torch.ones((width,lenth))
@@ -61,11 +62,11 @@ if __name__ == "__main__":
     displace_field = g()
     print('here1')
     result = displace_field(grid)
-    print('here2')
     #transform 0-1 float tensor to uint8 PIL image
     result *=255
     result=result.to(torch.uint8)
     result_img = T.ToPILImage(mode='L')(result)
+    result_img.show()
     '''
     g = MotionGenerator(10,magnitude=1)
     for i in trange(1,4801):
@@ -90,3 +91,4 @@ if __name__ == "__main__":
         warpped_img = displace_field(ima)
         warpped_img*=max
         tiff_write(f'data/dataset1/test/wrapped/{i}_wrapped.tif',warpped_img.numpy(),imagej=True)
+    '''
